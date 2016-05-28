@@ -42,6 +42,12 @@
 #include <CGAL/AABB_triangle_primitive.h>
 #include <CGAL/Polyhedron_3.h>
 
+// Geogram Delaunay interface
+#include <geogram/delaunay/delaunay.h>
+#include <geogram/mesh/mesh.h>
+#include <geogram/mesh/mesh_io.h>
+
+
 using namespace MVS;
 
 
@@ -778,6 +784,66 @@ bool Scene::ReconstructMesh(float distInsert, bool bUseFreeSpaceSupport, unsigne
 							float kInf
 )
 {
+  // ReconstructMesh using Geogram
+  {
+    using namespace GEO;
+    GEO::initialize();
+
+    TD_TIMER_STARTD();
+
+    // Configure a 3D Delaunay GEOGRAM interface
+    Delaunay_var delaunay = Delaunay::create(coord_index_t(3), "BDEL");
+    delaunay->set_keeps_infinite(false); // compute only the finite cells
+
+    GEO::vector<double> vertices(pointcloud.points.GetSize()*3);
+    // fetch points
+    FOREACH(i, pointcloud.points) {
+      const PointCloud::Point& X(pointcloud.points[i]);
+      vertices[(index_t) i * 3] = X.x;
+      vertices[(index_t) i * 3 + 1] = X.y;
+      vertices[(index_t) i * 3 + 2] = X.z;
+    }
+
+    // Compute the tetrahedra cells
+    {
+      // Init the used 3D points
+      std::cout << "Warning: For the moment only the case if (distInsert <= 0) is considered" << std::endl;
+      //  if (distInsert <= 0)
+      {
+        delaunay->set_vertices(pointcloud.points.GetSize(), &vertices[0]);
+
+        DEBUG_EXTRA("Delaunay tetrahedralization completed: %u points -> %u vertices, %u cells, (%s)",
+          pointcloud.points.GetSize(),
+          delaunay->nb_vertices(),
+          delaunay->nb_cells(),
+          TD_TIMER_GET_FMT().c_str());
+      }
+      /*else
+      {
+        // NOT yet implemented
+        return false;
+      }*/
+
+      // Debugging
+      {
+        //- parse all the cells
+        //- log the Tetrahedral mesh
+        GEO::Mesh M_out;
+        GEO::vector<index_t> tet2v(delaunay->nb_cells() * 4);
+        for (index_t t = 0; t < delaunay->nb_cells(); ++t)
+        {
+          tet2v[4 * t] = index_t(delaunay->cell_vertex(t, 0));
+          tet2v[4 * t + 1] = index_t(delaunay->cell_vertex(t, 1));
+          tet2v[4 * t + 2] = index_t(delaunay->cell_vertex(t, 2));
+          tet2v[4 * t + 3] = index_t(delaunay->cell_vertex(t, 3));
+        }
+        M_out.cells.assign_tet_mesh(3, vertices, tet2v, true);
+        M_out.show_stats();
+      }
+    }
+
+    return true;
+  }
 	using namespace DELAUNAY;
 	ASSERT(!pointcloud.IsEmpty());
 	mesh.Release();
@@ -882,7 +948,7 @@ bool Scene::ReconstructMesh(float distInsert, bool bUseFreeSpaceSupport, unsigne
 		cell_size_t ciID(0);
 		for (delaunay_t::All_cells_iterator ci=delaunay.all_cells_begin(), eci=delaunay.all_cells_end(); ci!=eci; ++ci, ++ciID) {
 			ci->info() = ciID;
-			// skip the finite cells
+			// skip the infinite cells
 			if (!delaunay.is_infinite(ci))
 				continue;
 			// find the finite face

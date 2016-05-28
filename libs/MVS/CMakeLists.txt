@@ -6,6 +6,11 @@ if(CGAL_FOUND)
 	link_directories(${CGAL_LIBRARY_DIRS})
 endif()
 
+FIND_PACKAGE(GEOGRAM ${SYSTEM_PACKAGE_REQUIRED})
+if(GEOGRAM_FOUND)
+  include_directories(${GEOGRAM_INCLUDE_DIRS})
+endif()
+
 FIND_PACKAGE(VCG ${SYSTEM_PACKAGE_REQUIRED})
 if(VCG_FOUND)
 	include_directories(${VCG_INCLUDE_DIRS})
@@ -37,7 +42,7 @@ cxx_library_with_type_no_pch(MVS "Libs" "" "${cxx_default}"
 set_target_pch(MVS Common.h)
 
 # Link its dependencies
-TARGET_LINK_LIBRARIES(MVS Common Math IO ${CERES_LIBS} ${CGAL_LIBS} ${CUDA_LIBRARIES})
+TARGET_LINK_LIBRARIES(MVS Common Math IO ${CERES_LIBS} ${CGAL_LIBS} ${CUDA_LIBRARIES} ${GEOGRAM_LIBRARIES})
 
 # Install
 SET_TARGET_PROPERTIES(MVS PROPERTIES
